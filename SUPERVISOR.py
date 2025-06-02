@@ -154,3 +154,9 @@ supervisor_agent = create_supervisor(
     agents = [research_agent, data_collector_agent, player_selector, Fantasy_FAQ_Agent],
     prompt = supervisor_prompt
 )
+
+inputs = {"messages": [{"role": "user", "content": "Give me info about today's ipl match"}]}
+result = supervisor_agent.invoke(inputs)
+for r in result['messages']:
+    print(r)
+print(result["messages"][-1].content)

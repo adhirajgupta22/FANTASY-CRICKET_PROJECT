@@ -5,6 +5,7 @@ from langchain_community.tools.tavily_search.tool import TavilySearchResults
 from langchain.tools import tool
 from collections import defaultdict
 from dotenv import load_dotenv
+from typing import List, Dict, Optional, Union, Any, tuple
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
