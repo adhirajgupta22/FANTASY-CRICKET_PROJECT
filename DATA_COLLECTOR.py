@@ -18,12 +18,22 @@ import os
 load_dotenv()
 LLM = ChatOpenAI(model = "gpt-4.1")
 
+# search tools -> will be used to search the web at times
+tavily_search = TavilySearchResults() 
+duck_search = DuckDuckGoSearchRun() 
+
 def fetch_response(url: str) -> dict:
     headers={"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
        return {}
     return response
+
+def fetch_stats(url: str, headers: dict) -> dict:
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+       return {}
+    return response.json()
 
 def get_espn_player_id(player_name: str) -> Optional[int]:
     """
@@ -487,9 +497,135 @@ def combine_recent_stats(player_name: str, player_role: str, overall_stats: dict
 
     return result
 
+# TOOLS -> DATA COLLECTOR AGENT
+# @tool
+# def player_details(player_names: List[str]) -> List[dict]:
+#     """This tool returns the player ID and name for a list of player names.
+#         It takes a list containing names of players as input and output a list 
+#         of dict with each dict containing the player id and name of that player."""
+    
+#     id_headers = {
+#         'x-apihub-key': '9HN92wz6l7bberNNuKkhDCXeb4YH4lXo2fIKuVdgCpB82jpHlM',
+#         'x-apihub-host': 'Cricbuzz-Official-Cricket-API.allthingsdev.co',
+#         'x-apihub-endpoint': 'b0242771-45ea-4c07-be42-a6da38cdec41'
+#     }
+
+#     results = []
+
+#     for name in player_names:
+#         id_url = f"https://Cricbuzz-Official-Cricket-API.proxy-production.allthingsdev.co/browse/player?search={name.replace(' ', '+')}"
+#         data = fetch_response(id_url, id_headers)
+#         players = data.get("player", [])
+#         if not players:
+#             results.append({"player name": name, "error": "No player found"})
+#             continue
+
+#         player_id = players[0].get("id")
+#         player_name = players[0].get("name")
+#         is_overseas = True
+#         if players[0].get("teamName") == "India":
+#             is_overseas = False
+
+#         if not player_id:
+#             results.append({"player name": name, "error": "Player ID not found"})
+#             continue
+
+#         role_url = f"https://Cricbuzz-Official-Cricket-API.proxy-production.allthingsdev.co/browse/player/{player_id}"
+#         role_headers = {
+#             'x-apihub-key': '9HN92wz6l7bberNNuKkhDCXeb4YH4lXo2fIKuVdgCpB82jpHlM',
+#             'x-apihub-host': 'Cricbuzz-Official-Cricket-API.allthingsdev.co',
+#             'x-apihub-endpoint': 'a055bf38-0796-4fab-8fe3-6f042f04cdba'
+#         }
+#         info = fetch_response(role_url, role_headers)
+#         player_role = info.get("role", "Unknown").lower()
+        
+#         is_wicketkeeper = "wk" in player_role
+
+#         batting_style = None
+#         bowling_style = None
+#         if "batsman" in player_role:
+#             batting_style = info.get("bat", "Unknown")
+#         elif "bowler" in player_role:
+#             bowling_style = info.get("bowl", "Unknown")
+#         else:
+#             batting_style = info.get("bat", "Unknown")
+#             bowling_style = info.get("bowl", "Unknown")
+
+#         results.append({
+#             "name": player_name,
+#             "role": player_role,
+#             "is_wicketkeeper": is_wicketkeeper,
+#             "is_overseas": is_overseas,
+#             "batting_style": batting_style,
+#             "bowling_style": bowling_style
+#         })
+
+#     return results
+
+# TOOLS -> DATA COLLECTOR AGENT
 
 @tool
-def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> Dict[str, Any]:
+def player_details(player_names: List[str]) -> List[dict]:
+    """This tool returns the player ID and name for a list of player names.
+        It takes a list containing names of players as input and output a list 
+        of dict with each dict containing the player id and name of that player."""
+    
+    id_headers = {
+        'x-apihub-key': '9HN92wz6l7bberNNuKkhDCXeb4YH4lXo2fIKuVdgCpB82jpHlM',
+        'x-apihub-host': 'Cricbuzz-Official-Cricket-API.allthingsdev.co',
+        'x-apihub-endpoint': 'b0242771-45ea-4c07-be42-a6da38cdec41'
+    }
+
+    results = []
+
+    for name in player_names:
+        id_url = f"https://Cricbuzz-Official-Cricket-API.proxy-production.allthingsdev.co/browse/player?search={name.replace(' ', '+')}"
+        data = fetch_stats(id_url, id_headers)
+        players = data.get("player", [])
+        if not players:
+            results.append({"player name": name, "error": "No player found"})
+            continue
+
+        player_id = players[0].get("id")
+        player_name = players[0].get("name")
+        is_overseas = True
+        if players[0].get("teamName") == "India":
+            is_overseas = False
+
+        if not player_id:
+            results.append({"player name": name, "error": "Player ID not found"})
+            continue
+
+        role_url = f"https://Cricbuzz-Official-Cricket-API.proxy-production.allthingsdev.co/browse/player/{player_id}"
+        role_headers = {
+            'x-apihub-key': '9HN92wz6l7bberNNuKkhDCXeb4YH4lXo2fIKuVdgCpB82jpHlM',
+            'x-apihub-host': 'Cricbuzz-Official-Cricket-API.allthingsdev.co',
+            'x-apihub-endpoint': 'a055bf38-0796-4fab-8fe3-6f042f04cdba'
+        }
+        info = fetch_stats(role_url, role_headers)
+        player_role = info.get("role", "Unknown").lower()
+        
+        is_wicketkeeper = "wk" in player_role
+
+        batting_style = None
+        bowling_style = None
+        
+        batting_style = info.get("bat", "Unknown")
+        bowling_style = info.get("bowl", "Unknown")
+
+        results.append({
+            "name": player_name,
+            "role": player_role,
+            "is_wicketkeeper": is_wicketkeeper,
+            "is_overseas": is_overseas,
+            "batting_style": batting_style,
+            "bowling_style": bowling_style
+        })
+
+    return results
+
+@tool
+def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> List[Dict[str, Any]]:
     """
     Computes a player's form profile by aggregating T20 stats in 3 scopes:
     (1) overall last 8 innings, (2) vs a specific opposition, and (3) at a specific venue.
@@ -507,7 +643,7 @@ def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> Dict[
         venue_name (str): Venue name (e.g., "eden")
 
     Returns:
-        Dict[str, Any]: One summary dict per player in the format:
+        List[Dict[str, Any]]: One summary dict per player in the format:
             {
               "player name": <str>,
               "role": <str>,
@@ -609,17 +745,117 @@ def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> Dict[
         opp_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = opposition_id, venue_id = None, role_type = role_type)
         venue_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = None, venue_id = venue_id, role_type = role_type)
 
-    return combine_recent_stats(name, role, overall_stats_dict, opp_stats_dict, venue_stats_dict, opposition, venue_name, is_wk, is_overseas, batting_style, bowling_style)
+        player_summary = combine_recent_stats(
+            name, role, overall_stats_dict, opp_stats_dict, venue_stats_dict,
+            opposition, venue_name, is_wk, is_overseas, batting_style, bowling_style
+        )
+        results.append(player_summary)
+
+    return results
+    # return combine_recent_stats(name, role, overall_stats_dict, opp_stats_dict, venue_stats_dict, opposition, venue_name, is_wk, is_overseas, batting_style, bowling_style)
 
 
 # 2. Data Collector Agent: 
 data_collector_agent = create_react_agent(
     model = LLM,
     name = "data_miner",
-    tools = [player_stats],
+    tools = [player_stats,player_details,tavily_search, duck_search],
     prompt = (
-        "You are an agent which is phenomenal at maths. Answer the query of the user to the best you can."
+        """
+            You are **data_miner**, an intelligent agent designed to fetch T20 cricket stats from ESPNcricinfo.
+
+            You have access to 2 tools:
+            1. `player_details`: Given one or more player names, returns each player’s metadata in JSON:
+            - `"role"`
+            - `"is_wicketkeeper"` (“True”/“False”)
+            - `"is_overseas"` (“True”/“False”)
+            - `"batting_style"`
+            - `"bowling_style"`
+            2. `player_stats`: Returns a player’s T20 stats given detailed input, including last 8 innings, performance vs opposition, and at a venue.
+
+            ---
+
+            ### TASK:
+
+            When a user asks for cricket stats, follow these steps:
+
+            1. **Parse input.**
+            - The user will provide:
+                - One or more player names (plain text or structured list)
+                - An opposition team name
+                - A venue name
+            - Extract and normalize:
+                - `"players"`: list of player names
+                - `"opposition"`
+                - `"venue_name"`
+            - Normalize team/venue names to match ESPNcricinfo conventions (e.g., “RCB” → “Royal Challengers Bengaluru”).
+
+            2. **Fetch player metadata.**
+            - Call `player_details` with the `"players"` list.
+            - Expect a JSON array where each entry has:
+                ```json
+                {
+                "name": "...",
+                "role": "...",
+                "is_wicketkeeper": "True" or "False",
+                "is_overseas": "True" or "False",
+                "batting_style": "...",
+                "bowling_style": "..."
+                }
+                ```
+            - If any required field is missing for a player, return an error specifying which field and which player.
+
+            3. **Build the `player_details` payload for stats.**
+            - For each player in the metadata response, add `"opposition"` (from step 1).
+            - Assemble:
+                ```json
+                {
+                "player_details": [
+                    {
+                    "name": "...",
+                    "role": "...",
+                    "is_wicketkeeper": "...",
+                    "is_overseas": "...",
+                    "batting_style": "...",
+                    "bowling_style": "...",
+                    "opposition": "..."
+                    },
+                    ...
+                ],
+                "venue_name": "..."
+                }
+                ```
+
+            4. **Call `player_stats`.**
+            - Pass the JSON from step 3 exactly as input.
+            - **RULES:** 
+                - Do **NOT** edit or summarize the `player_stats` output. Return it exactly as received.
+                - If any player or venue normalization fails, return an error indicating what could not be resolved.
+
+        """
     )
 )
 
-print(player_stats.invoke({"player_details": [{"name": "Ravindra jadeja", "role": "bowlingallrounder", "is_wicketkeeper": "False", "is_overseas": "False", "batting_style": "Right-hand-Batsman", "bowling_style": "Right-arm-Medium", "opposition": "Mumbai indians"}], "venue_name": "chepauk"}))
+# print(player_stats.invoke({"player_details": [{"name": "Ravindra jadeja", "role": "bowlingallrounder", "is_wicketkeeper": "False", "is_overseas": "False", "batting_style": "Right-hand-Batsman", "bowling_style": "Right-arm-Medium", "opposition": "Mumbai indians"}], "venue_name": "chepauk"}))
+
+inputs = {"messages": [{"role": "user", "content": """
+    Match Venue - M Chinnaswamy Stadium, Bengaluru
+
+    Player 1: Virat Kohli
+    Name: Virat Kohli
+    Opposition: Punjab Kings
+                        
+    Player 2: Shreyas Iyer
+    Name: Shreyas Iyer
+    Opposition: Royal Challengers Bengaluru
+    
+    Player 3: Hardik Pandya
+    Name: Hardik Pandya
+    Opposition: RCB
+        """}]}
+result = data_collector_agent.invoke(inputs)
+for r in result['messages']:
+    print(r)
+print(result["messages"][-1].content)
+
+# print(player_details.invoke({"player_names": ["Jasprit bumrah", "Virat Kohli"]}))
