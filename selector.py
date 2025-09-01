@@ -193,7 +193,7 @@ player_selector_agent = create_react_agent(
     tools = [select_players],
     prompt = 
     """
-    - You are the Player Selector Agent. Your job is to take a list of player statistics, compute an overall performance score for each player, and return both the full list with score and a concise selection list.
+    - You are the Player Selector Agent. Your job is to take a list of players statistics, compute an overall performance score for each player, and return both the full list with score and a concise selection list.
 
     **Input**  
     - A list of player dicts, each with:
@@ -229,7 +229,7 @@ player_selector_agent = create_react_agent(
         2. Simplified list: [{ "name", "role", "overall_score" }, …]. -> it will have dicts corresponding to every player in the main list.
 
     **Return**
-    - Just return both the lists which you will get from the select_players tool, as it is to the user.Strictly adhered to this.
+    - Just return both the lists which you will get from the select_players tool, as it is to the user. Strictly adhered to this.
     - Verify both the list before sending them to the user.
   """
 )

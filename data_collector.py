@@ -80,7 +80,7 @@ def resolve_to_id(name: str, mapping: Dict[str, int]) -> Optional[int]:
     return None
 
 
-def get_recent_stats(player_id: int, role_type: str) -> Dict[str, Any]:
+def get_recent_stats(player_id: int, role_type: str) -> Dict[str, Dict[str, Any]]:
     """
     Fetch and aggregate stats over the last 8 t20 innings for a player.
     If the player hasn't played 8 t20 innings then it will fetch as many inn as the player has played.
@@ -97,7 +97,7 @@ def get_recent_stats(player_id: int, role_type: str) -> Dict[str, Any]:
         role_type (str): One of "batting", "wk-batsman", "bowling", "allround".
 
     Returns:
-        Dict[Dict[str, Any]]: Aggregated stats depending on role_type.
+        Dict[str, Dict[str, Any]]: Aggregated stats depending on role_type.
         Returns a dict which contains one or two dict depending upon role_type
     Raises:
         ValueError: If role_type is not one of the supported options.
@@ -282,7 +282,7 @@ def get_recent_stats(player_id: int, role_type: str) -> Dict[str, Any]:
         return {
             "Batting": aggregate_batting(hdrs, rows)
             }
-    elif role_type in "bowling":
+    elif role_type == "bowling":
         hdrs, rows = scrape_table("bowling")
         return {
             "Bowling": aggregate_bowling(hdrs, rows)
@@ -294,7 +294,7 @@ def get_recent_stats(player_id: int, role_type: str) -> Dict[str, Any]:
             "Bowling": aggregate_bowling(bowling_h, bowling_r)
         }
     else:
-        raise ValueError("role_type must be 'batting', 'bowler' or 'allround'")
+        raise ValueError("role_type must be 'batting', 'bowling' or 'allround'")
     
     
 def get_opp_venue_stats(player_id: int, role_type: str, opposition_id: Optional[int] = None, venue_id: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
@@ -469,10 +469,11 @@ def combine_recent_stats(player_name: str, player_role: str, overall_stats: dict
     }
 
     # 1) Overall
-    result["recent_stats"].append({
-        "title": f"last_{n}_innings_stats",
-        "data": overall_stats
-    })
+    if overall_stats is not None:
+        result["recent_stats"].append({
+            "title": f"last_{n}_innings_stats",
+            "data": overall_stats
+        })
 
     # 2) Versus opposition
     if opp_stats is not None and opposition_label:
@@ -554,7 +555,7 @@ def player_details(player_names: List[str]) -> List[dict]:
         info = fetch_stats(role_url, role_headers)
         player_role = info.get("role", "Unknown").lower()
         
-        if "wk" in player_role:
+        if "wk" in player_role:     # check the whole string of player role which is "wk-batsman"
             is_wicketkeeper = "True"
         else:
             is_wicketkeeper = "False"
@@ -577,7 +578,7 @@ def player_details(player_names: List[str]) -> List[dict]:
     return results
 
 @tool
-def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> List[Dict[str, Any]]:
+def player_stats(player_details: List[Dict[str, str]]) -> List[Dict[str, Any]]:
     """
     Computes a player's form profile by aggregating T20 stats in 3 scopes:
     (1) overall last 8 innings, (2) vs a specific opposition, and (3) at a specific venue.
@@ -661,6 +662,7 @@ def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> List[
     for detail in player_details:
         name = detail.get("name", "").strip()
         opposition = detail.get("opposition", "").strip()
+        venue_name = detail.get("venue","").strip()
         role = detail.get("role", "").strip().lower()
         is_wk = detail.get("is_wicketkeeper", "")
         is_overseas = detail.get("is_overseas", "")
@@ -683,20 +685,30 @@ def player_stats(player_details: List[Dict[str, str]], venue_name: str) -> List[
             results.append({"name": name, "error": f"Could not resolve ID after 10 attempts. Last error: {err}"})
             continue
 
-        # Resolve opposition and venue IDs
-        opposition_id = resolve_to_id(opposition, opposition_ids)
-        venue_id = resolve_to_id(venue_name, venue_ids)
+        # Resolve opposition and venue IDs using the given dict of opposition and venue names with their ids
+        opposition_id = None
+        venue_id = None
+        if opposition:
+            opposition_id = resolve_to_id(opposition, opposition_ids)
+        if venue_name:
+            venue_id = resolve_to_id(venue_name, venue_ids)
 
         if "batsman" in role: # wk-batsman, batsman
             role_type = "batting" # It is a parameter in the url
+        elif "wk-batsman" in role: # wk-batsman
+            role_type = "batting"
         elif "bowler" in role: # bowler
             role_type = "bowling"
         else:
-            role_type = "allround" # battingallrounder, bowlingallrounder
+            role_type = "allround" # batting allrounder, bowling allrounder
 
+        opp_stats_dict = None
+        venue_stats_dict = None
         overall_stats_dict = get_recent_stats(player_id = player_id, role_type = role_type)
-        opp_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = opposition_id, venue_id = None, role_type = role_type)
-        venue_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = None, venue_id = venue_id, role_type = role_type)
+        if opposition:
+            opp_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = opposition_id, venue_id = None, role_type = role_type)
+        if venue_name:
+            venue_stats_dict = get_opp_venue_stats(player_id = player_id, opposition_id = None, venue_id = venue_id, role_type = role_type)
 
         player_summary = combine_recent_stats(
             name, role, overall_stats_dict, opp_stats_dict, venue_stats_dict,
@@ -715,15 +727,16 @@ data_collector_agent = create_react_agent(
     prompt = (
         """
             - You are a data collector expert which fetches T20 stats for players. Your job is to fetch the T20 stats for player(s)
-            and return them to the user.
-            - You will receive a venue name and a list of dict where each dict contains the player name and opposition as input.
+            and return them to the supervisor.
+            **work? - The supervisor will only ask you for either the player details, player stats or player past performances. you can receive single or more than one players alongwith opposition and venue names, use the below description to give results.
+
             **Note - If the player(s)names or venue name or opposition name are incomplete and does only contain first word,
             then use tavily_search or duck_search to get the complete name and pass that name in the dict.Just check the input you receive
             and if you found some players with incomplete name or venue whose name is incomplete then do a web search and replace with the full name before calling any tool.
             - You have acccess to two tools to fetch the stats, each of them fetches different stats. Moreover, you have also access to
             tavily-search and duck_search tools to search the web in case if needed for something.
             **Tools**:
-            -> player_details: Given one or more player names, returns each player’s metadata in Dict format:
+            -> player_details: use this tool when the supervisor asks for player details or for player stats. Given one or more player names, returns each player’s metadata in Dict format:
             {
                 "name": {name}
                 "role": {role}
@@ -734,43 +747,47 @@ data_collector_agent = create_react_agent(
             }
             - all the values are string type.
             - So basically it inputs a list of names of the players and return a list of dict where each dict contains metadata specific to a player.
+            - use this tool if you are guided by the supervisor to find player details. But it is also used when supervisor asks to find player stats. Below are more detailed instructions for that.
 
-            **IMPORTANT** - Now you have to add a additional "opposition" key in the dict provided by this tool for all the players by yourself, it will be provided to you by the user,
-            so basically you will receive a, **list of dict where each dict will contain the player name and its opposition**, 
-            input_list = [
-
-                {"player_name": "<PLAYER 1 NAME>", "opposition": "<OPPOSITION 1 NAME>"},
-                {"player_name": "<PLAYER 2 NAME>", "opposition": "<OPPOSITION 2 NAME>"},
+            
+            Note - do this only when supervisor asks you to find player stats/performances
+            **IMPORTANT** - Now you have to add a additional "opposition" key and "venue" key in the dict provided by this tool for all the players by yourself, it will be provided to you by the supervisor.if not provided then no issue dont make any changes to the dict.
+            take the opposition and venue from the input you received from the supervisor and add them as below in the dict given by the player_details tool.
+            final_list = [
+                {"player_name": "<PLAYER 1 NAME>", "opposition": "<OPPOSITION 1 NAME>" , "venue": "<VENUE NAME>"},
+                {"player_name": "<PLAYER 2 NAME>", "opposition": "<OPPOSITION 2 NAME>", "venue": "<VENUE NAME>"},
                 ...
-                ] (this is the format of input which u will receive)
-            and you have use that information to add the "opposition" key to the output by the player_details tool.
-            - Now, you have to send the exact same modified list if dict as an input to the player_stats tool to fetch further career related stats.
-
-            -> player_stats: This tool fetches player’s T20 stats - last 8 innings performance, performance vs a specific opposition, and perfomance at a speciifc venue.
-                Input to this tool will be the same modified list of dicta nd the name of the venue which is a string.
-                    [        
+                ] (this is the format of input which u will form if given opposition and venue data)
+            - Now, you have to send the exact same modified list of dict as an input to the player_stats tool to fetch further career related stats.
+                make sure that you pass it to the the tool as a list even if contains only one player.
+            
+            -> player_stats:Use this tool when the supervisor asks for player stats This tool can fetch player’s T20 stats - last 8 innings performance, performance vs a specific opposition, and perfomance at a speciifc venue.
+                Input to this tool will be the same modified(if given the venue and opposition data also) list of dict and the name of the venue which is a string.
+                    [
                         {
-                        "name": 
-                        "role":
-                        "is_wicketkeeper"
-                        "is_overseas"
-                        "batting_style":
-                        "bowling_style": 
-                        "opposition":
+                            "name": "<player_name>",
+                            "role": "<player_role>",
+                            "is_wicketkeeper": "<True/False>",
+                            "is_overseas": "<True/False>",
+                            "batting_style": "<e.g., Right-hand-Batsman>",
+                            "bowling_style": "<e.g., Right-arm-Medium>",
+                            "opposition": "<opposition_team_name>",
+                            "venue": "<venue_name>"
                         },
                         {
-
-                        ....
-
+                            "name": "<player_name>",
+                            "role": "<player_role>",
+                            "is_wicketkeeper": "<True/False>",
+                            "is_overseas": "<True/False>",
+                            "batting_style": "<e.g., Left-hand-Batsman>",
+                            "bowling_style": "<e.g., Left-arm-Spin>",
+                            "opposition": "<opposition_team_name>",
+                            "venue": "<venue_name>"
                         },
-                        {
+                        ...
+                    ]
 
-                        ....
-
-                        },......
-                    ], venue_name -> str
-
-            - This tool will add the stats to it and will return a list of dict where each dict contains information/stats for a particular player.
+            - This tool will add the stats to this dict and will return a list of dict where each dict contains information and stats for a particular player.
             Returns:
                 List[Dict[str, Any]]: One summary dict per player in the format:
                     {
@@ -795,27 +812,38 @@ data_collector_agent = create_react_agent(
                         }
                     ]
                     }
-            **Note - You have to output this exact same list to the user which oyu got from the "player_stats" tool without any modification to it.
+            **Note - You have to output this exact same list to the supervisor which you got from the "player_stats" tool without any modification to it when the supervisor command was asking for stats otherwise provide the result of the player details tool in same format.
             - You also have the access of tavily_search and duck_search in case you need to do web search to get some data.
+            - you dont give exact previous performances so if the supervisor asks for past performance utilize the search tools to give those performance and give them in a proper deccent UI format.
 
         """
     )
 )
 
-"""
-inputs = {"messages": [{"role": "user", "content":
-        
-        [
-            {"name": "Virat", "opposition": "Mumbai Indians"},
-            {"name": "Rohit Sharma", "opposition": "Royal Challengers Bengaluru"},
-            {"name": "Jasprit bumrah", "opposition": "Kolkata Knight Riders"},
-            {"name": "hardik pandya", "opposition": "Royal Challengers Bengaluru"}
-        ],
-        venue = Chinnaswamy Stadium, Bengaluru
-        
-            }]}
-result = data_collector_agent.invoke(inputs)
-for r in result['messages']:
-    r.pretty_print()
+# inputs = {
+#     "messages": [
+#         {
+#             "role": "user",
+#             "content": "what is the score of shubhman gill in the test match against england"
+#         }
+#     ]
+# }
+# result = data_collector_agent.invoke(inputs)
 
-"""
+# for r in result["messages"]:
+#     r.pretty_print()
+
+# inputs = {"messages": [{"role": "user", "content":
+        
+#         [
+#             {"name": "Virat"},
+#             {"name": "Rohit Sharma", "opposition": "Royal Challengers Bengaluru"},
+#             {"name": "Jasprit bumrah", "opposition": "Kolkata Knight Riders"},
+#             {"name": "hardik pandya", "opposition": "Royal Challengers Bengaluru"}
+#         ],
+#         venue = Chinnaswamy Stadium, Bengaluru
+        
+#             }]}
+# result = data_collector_agent.invoke(inputs)
+# for r in result['messages']:
+#     r.pretty_print()

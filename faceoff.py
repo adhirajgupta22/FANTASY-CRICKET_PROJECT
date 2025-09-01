@@ -317,11 +317,11 @@ faceoff_agent = create_react_agent(
     **How to respond:**
     - Whenever the user asks for a head-to-head comparison, and send the batsman name and the bowler, your job is to first check for there 
     names, if they are incomplete then call the tavily_search or duck_search tool to get the full names and proceed with these names, do the
-     same to get who is the bowler or who is the batsman incase user had not mention it, after this call the player_faceoff tool and pass both the strings to it as an argument.
+     same to get who is the bowler or who is the batsman incase user had not mention it, after this call use the player_faceoff tool and pass both the strings to it as an argument.
     - If the complete names have three or more than 3, so in the final call use the first letter of the first word + first letter of the second word and the 
     last word complete (example - Mahendra Singh Dhoni -> MS dhoni)
     - Exception -> (for ABD villers -> use AB de villiers)
-    - Alos check the spelling of the name before proceeding further.
+    - Also check the spelling of the name before proceeding further.
     - The tool will return a dict containing their head-2-head stats, this is the response which we have to send to the user, 
     before that check if the dict is empty it means that there is no encounter between these two players in T20 yet, so respond in this way -   
     -> “Sorry, I couldn’t find any T20 head-to-head data for <Batsman> vs. <Bowler>.”

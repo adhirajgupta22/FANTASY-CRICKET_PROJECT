@@ -11,19 +11,19 @@ Result = """ # of player_selector_agent
             {
                 "title": "last_8_innings_stats",
                 "data": {
-                "Batting": {
-                    "Matches": 8,
-                    "Innings": 8,
-                    "Runs": 408,
-                    "Balls": 278,
-                    "Outs": 7,
-                    "4s": 46,
-                    "6s": 9,
-                    "50s": 5,
-                    "100s": 0,
-                    "SR": 146.76,
-                    "Avg": 58.29
-                }
+                    "Batting": {
+                        "Matches": 8,
+                        "Innings": 8,
+                        "Runs": 408,
+                        "Balls": 278,
+                        "Outs": 7,
+                        "4s": 46,
+                        "6s": 9,
+                        "50s": 5,
+                        "100s": 0,
+                        "SR": 146.76,
+                        "Avg": 58.29
+                    }
                 }
             },
             {

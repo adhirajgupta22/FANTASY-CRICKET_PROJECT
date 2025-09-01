@@ -47,8 +47,6 @@ supervisor_agent = create_supervisor(
         However, you are also capable of answering **general questions** (like coding, translations, or trivia) to be more helpful and conversational.
 
         Always:
-        - **very important** make sure the format of the output should be very beautiful for the UI
-        - Answer their query helpfully, even if it's outside fantasy sports
         - Gently remind users that your main specialization is fantasy IPL content
         - If the query is relevant to your agents, route it to them
         - If not, use your own knowledge to answer briefly and accurately 
@@ -81,36 +79,35 @@ supervisor_agent = create_supervisor(
            when to use?? -> use this when the user query is about player details/player stats/player performance, just clearly command the agent about the player name, opposition and venue if provided by the user
 
         make the output as better looking as possible,like giving lists or points something for better visuals.
+        🔧 Output Formatting Rules (Very Important):
+
+            - All responses should be visually clear, structured, and beautiful for UI display.
+            - Use **headings**, **bullet points**, **lists**, **tables**, or **highlighted blocks** wherever applicable.
+            - For repeated data (like stats, match scores, comparisons), prefer **Markdown tables** or **numbered lists**.
+            - For explanations or long-form text, break into **short paragraphs** with line spacing.
+            - Avoid unnecessary characters like `---`, repeated emojis, or inconsistent formatting.
+            - Start responses with a short summary or friendly intro **with an emoji or bold title**, and end with a helpful follow-up like:
+            > “Let me know if you want more info or tips on this!”
+            - Keep tone helpful, focused, and visually clean for rendering in a web app.
+
     """
     )
 
 )
 
 agent = supervisor_agent.compile(checkpointer=memory)
+import uuid
+# === API Route ===
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_input = request.json.get("message", "")
+    try:
+        dynamic_config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        result = agent.invoke({"messages": [{"role": "user", "content": user_input}]}, config=dynamic_config)
+        messages = [result["messages"][-1].content]
+        return jsonify({"messages": messages})  
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-inputs = {
-    "messages": [
-        {
-            "role": "user",
-            "content": "what is the score of shubhman gill in last 5 matches"
-        }
-    ]
-}
-result = agent.invoke(inputs,config=config)
-
-for r in result["messages"]:
-    r.pretty_print()
-
-# # === API Route ===
-# @app.route("/chat", methods=["POST"])
-# def chat():
-#     user_input = request.json.get("message", "")
-#     try:
-#         result = agent.invoke({"messages": [{"role": "user", "content": user_input}]}, config=config)
-#         messages = [result["messages"][-1].content]
-#         return jsonify({"messages": messages})  
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-# if __name__ == "__main__":
-#     app.run(debug=True) # will run on http://localhost:5000
+if __name__ == "__main__":
+    app.run(debug=True) # will run on http://localhost:5000

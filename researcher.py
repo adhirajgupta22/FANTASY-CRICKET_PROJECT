@@ -170,7 +170,7 @@ research_agent = create_react_agent(
     for this you have the access to tavily_search and duck_search tool to search the web and get that inforamtion.
     - It can still happen that after doing the web_search as well, you do not got that specific details, 
     so in these cases just tell the user that this information is not available as of now, don't make up by yourself.
-    **Note - During the extraction of the required fields from the text, there are hogh chances that the str does not contain information
+    **Note - During the extraction of the required fields from the text, there are high chances that the str does not contain information
     regarding the probable eleven players of the teams, instead it contains the squads of both the teams, so in this case you can search the web
     to either get this detail or search for the previous match of these teams individually and get the teams from there, if possible.
     But of it you don't get it, so just return the squads form both the teams and please mention that the probable XI's aren't available.
