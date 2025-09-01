@@ -23,7 +23,7 @@ const ChatPage = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     try {
-      const response = await axios.post("http://localhost:5000/chat", {
+      const response = await axios.post("/chat", {
         message: input,
       });
       if (response.data.messages) {
