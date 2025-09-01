@@ -12,4 +12,5 @@ duckduckgo-search
 flask
 flask-cors
 python-dotenv
+ddgs
 
