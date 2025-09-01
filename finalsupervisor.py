@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,send_from_directory
 from flask_cors import CORS
 from langchain_openai import ChatOpenAI
 from langgraph_supervisor import create_supervisor
@@ -18,7 +18,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="client_build", static_url_path="")
 CORS(app)  # allows requests from the frontend
 
 # === Load LangGraph Supervisor ===
@@ -109,5 +109,21 @@ def chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# === React Frontend Routes ===
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, "index.html")
+
+# === Run ===
 if __name__ == "__main__":
-    app.run(debug=True) # will run on http://localhost:5000
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
+# if __name__ == "__main__":
+#     import os
+#     port = int(os.environ.get("PORT", 5000))
+#     app.run(host="0.0.0.0", port=port, debug=False)
+#     # app.run(debug=True) # will run on http://localhost:5000

@@ -9,3 +9,7 @@ bs4
 faiss-cpu
 pypdf
 duckduckgo-search
+flask
+flask-cors
+python-dotenv
+
